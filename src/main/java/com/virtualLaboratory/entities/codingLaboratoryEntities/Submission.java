@@ -1,6 +1,6 @@
-package com.virtualLaboratory.entities.CodingLaboratoryEntities;
+package com.virtualLaboratory.entities.codingLaboratoryEntities;
 
-import com.virtualLaboratory.entities.Academics.Student;
+import com.virtualLaboratory.entities.academics.Student;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -27,4 +27,17 @@ public class Submission {
     private LocalDateTime submitAt;
     private Integer marks;
     private String feedback;
+    @Lob
+    private String stdout;
+    @Lob
+    private String stderr;
+    private Integer exitCode;
+    private Long executionMs;
+    @Enumerated(EnumType.STRING)
+    private Status status = Status.SUBMITTED;
+
+    public enum Status {
+        SUBMITTED,
+        GRADED
+    }
 }

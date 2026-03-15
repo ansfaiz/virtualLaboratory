@@ -1,7 +1,7 @@
-package com.virtualLaboratory.entities.Academics;
+package com.virtualLaboratory.entities.academics;
 
-import com.virtualLaboratory.entities.AcademicStructureEntities.Batch;
-import com.virtualLaboratory.entities.AcademicStructureEntities.Section;
+import com.virtualLaboratory.entities.academicStructureEntities.Batch;
+import com.virtualLaboratory.entities.academicStructureEntities.Section;
 import com.virtualLaboratory.entities.Users;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

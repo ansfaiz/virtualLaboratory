@@ -1,4 +1,4 @@
-package com.virtualLaboratory.entities.CodingLaboratoryEntities;
+package com.virtualLaboratory.entities.codingLaboratoryEntities;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -17,4 +17,8 @@ public class ProgrammingLanguage {
     @GeneratedValue(strategy= GenerationType.IDENTITY)
     private Long id;
     private  String name;
+    private String version;
+    private String extension;
+    private String icon;
+    private boolean active = true;
 }

@@ -1,4 +1,4 @@
-package com.virtualLaboratory.entities.Academics;
+package com.virtualLaboratory.entities.academics;
 
 import com.virtualLaboratory.entities.Users;
 import jakarta.persistence.*;

@@ -1,6 +1,6 @@
-package com.virtualLaboratory.entities.PerformanceTracking;
+package com.virtualLaboratory.entities.performanceTracking;
 
-import com.virtualLaboratory.entities.Academics.Teacher;
+import com.virtualLaboratory.entities.academics.Teacher;
 import jakarta.persistence.*;
 import lombok.*;
 
