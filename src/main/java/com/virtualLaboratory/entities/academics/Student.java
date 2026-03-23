@@ -2,7 +2,7 @@ package com.virtualLaboratory.entities.academics;
 
 import com.virtualLaboratory.entities.academicStructureEntities.Batch;
 import com.virtualLaboratory.entities.academicStructureEntities.Section;
-import com.virtualLaboratory.entities.Users;
+import com.virtualLaboratory.entities.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -19,7 +19,7 @@ public class Student
     @OneToOne
     @MapsId
     @JoinColumn(name = "id")
-    private Users user;
+    private User user;
     @ManyToOne
     @JoinColumn(name = "section_id")
     private Section section;

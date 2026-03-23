@@ -1,6 +1,6 @@
 package com.virtualLaboratory.entities.academics;
 
-import com.virtualLaboratory.entities.Users;
+import com.virtualLaboratory.entities.User;
 import com.virtualLaboratory.entities.academicStructureEntities.Section;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -24,7 +24,7 @@ public class Teacher {
     @OneToOne
     @MapsId
     @JoinColumn(name = "id")
-    private Users user;
+    private User user;
     @OneToMany(mappedBy = "teacher")
     private List<Section> sections;
 

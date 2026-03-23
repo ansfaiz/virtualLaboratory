@@ -1,6 +1,6 @@
 package com.virtualLaboratory.entities.academics;
 
-import com.virtualLaboratory.entities.Users;
+import com.virtualLaboratory.entities.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -16,5 +16,5 @@ public class Deen {
     @OneToOne
     @MapsId
     @JoinColumn(name = "id")
-    private Users users;
+    private User users;
 }
