@@ -1035,7 +1035,7 @@ Building this platform provided hands-on experience with production-pattern back
 
 <div align="center">
 
-**Ans Faiz**
+**Md Faiyaz Ansari**
 
 *Java Backend Developer · Spring Boot Engineer · Full-Stack Developer*
 
@@ -1054,7 +1054,7 @@ Building this platform provided hands-on experience with production-pattern back
 ```
 MIT License
 
-Copyright (c) 2026 Ans Faiz
+Copyright (c) 2026 Md Faiyaz Ansari
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
