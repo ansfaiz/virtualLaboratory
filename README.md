@@ -107,7 +107,7 @@ The Virtual Laboratory Platform replaces the fragmented manual workflow with a *
 | **Typed data contracts** | Full DTO layer; all request/response shapes are explicitly typed and validated |
 | **Lifecycle state machines** | Assignment status (`DRAFT`/`PUBLISHED`) and Submission status (`SUBMITTED`/`GRADED`) modeled as database-persisted enums |
 
-Every API endpoint maps to a real workflow step. There are no speculative features — only purposeful, testable engineering decisions.
+Every API endpoint maps to a real workflow step. There are no speculative features — only purposeful, testable estangineering decisions.
 
 ---
 
