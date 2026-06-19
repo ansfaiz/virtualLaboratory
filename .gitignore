@@ -12,7 +12,7 @@ target/
 .settings
 .springBeans
 .sts4-cache
-
+.virtual_lab_audit_report.md
 ### IntelliJ IDEA ###
 .env
 .idea
@@ -32,3 +32,7 @@ build/
 
 ### VS Code ###
 .vscode/
+.virtual_lab_audit_report*.md
+virtual_lab_audit_report.md
+virtual_lab_audit_report_v2.md
+.DS_Store
