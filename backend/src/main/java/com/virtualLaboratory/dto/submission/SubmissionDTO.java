@@ -6,6 +6,7 @@ public record SubmissionDTO(
     Long id,
     Long assignmentId,
     Long studentId,
+    String studentName,
     String code,
     LocalDateTime submitAt,
     Integer marks,
