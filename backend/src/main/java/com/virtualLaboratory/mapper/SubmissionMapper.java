@@ -11,6 +11,7 @@ public class SubmissionMapper {
             submission.getId(),
             submission.getAssignment() != null ? submission.getAssignment().getId() : null,
             submission.getStudent() != null ? submission.getStudent().getId() : null,
+            getStudentName(submission),
             submission.getCode(),
             submission.getSubmitAt(),
             submission.getMarks(),
@@ -21,5 +22,12 @@ public class SubmissionMapper {
             submission.getExitCode(),
             submission.getExecutionMs()
         );
+    }
+
+    private String getStudentName(Submission submission) {
+        if (submission.getStudent() == null || submission.getStudent().getUser() == null) {
+            return null;
+        }
+        return submission.getStudent().getUser().getFullName();
     }
 }
