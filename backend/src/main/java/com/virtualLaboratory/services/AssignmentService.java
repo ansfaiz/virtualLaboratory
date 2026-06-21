@@ -120,9 +120,7 @@ public class AssignmentService {
     public AssignmentDTO update(Long id, AssignmentUpdateRequest request) {
         Assignment assignment = assignmentRepository.findById(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Assignment not found"));
-        if (assignment.getStatus() == Assignment.Status.PUBLISHED) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Assignment already published");
-        }
+        validatePublishedMaxScoreUpdate(assignment, request.maxScore());
         if (request.title() != null) {
             assignment.setTitle(request.title());
         }
@@ -139,6 +137,23 @@ public class AssignmentService {
             assignment.setMaxScore(request.maxScore());
         }
         return assignmentMapper.toDto(assignmentRepository.save(assignment));
+    }
+
+    private void validatePublishedMaxScoreUpdate(Assignment assignment, Integer newMaxScore) {
+        if (assignment.getStatus() != Assignment.Status.PUBLISHED || newMaxScore == null) {
+            return;
+        }
+        boolean hasGradeAboveNewMaxScore = submissionRepository.existsByAssignmentIdAndStatusAndMarksGreaterThan(
+            assignment.getId(),
+            Submission.Status.GRADED,
+            newMaxScore
+        );
+        if (hasGradeAboveNewMaxScore) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Published assignment has graded submissions above the requested max score"
+            );
+        }
     }
 
     @Transactional
