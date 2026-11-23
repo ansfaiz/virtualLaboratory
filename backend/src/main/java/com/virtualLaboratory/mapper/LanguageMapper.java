@@ -15,6 +15,7 @@ public class LanguageMapper {
         language.setExtension(request.extension());
         language.setActive(request.active());
         language.setIcon(request.icon());
+        language.setJudge0LanguageId(request.judge0LanguageId());
         return language;
     }
 
@@ -28,6 +29,9 @@ public class LanguageMapper {
         if (request.icon() != null) {
             language.setIcon(request.icon());
         }
+        if (request.judge0LanguageId() != null) {
+            language.setJudge0LanguageId(request.judge0LanguageId());
+        }
     }
 
     public LanguageDTO toDto(ProgrammingLanguage language) {
@@ -37,7 +41,8 @@ public class LanguageMapper {
             language.getVersion(),
             language.getExtension(),
             language.getIcon(),
-            language.isActive()
+            language.isActive(),
+            language.getJudge0LanguageId()
         );
     }
 }

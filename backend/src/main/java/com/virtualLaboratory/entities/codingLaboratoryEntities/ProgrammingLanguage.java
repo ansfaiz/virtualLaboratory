@@ -21,4 +21,5 @@ public class ProgrammingLanguage {
     private String extension;
     private String icon;
     private boolean active = true;
+    private Integer judge0LanguageId;
 }

@@ -9,9 +9,14 @@ import com.virtualLaboratory.entities.academics.Teacher;
 import com.virtualLaboratory.entities.codingLaboratoryEntities.Assignment;
 import com.virtualLaboratory.entities.codingLaboratoryEntities.Submission;
 import com.virtualLaboratory.repository.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -100,6 +105,77 @@ public class AnalyticsService {
     }
 
     public SectionAnalyticsDTO getSectionAnalytics(Long sectionId) {
-        return new SectionAnalyticsDTO(sectionId, null, List.of(), List.of(), List.of());
+        sectionRepository.findById(sectionId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Section not found"));
+
+        List<Student> students = studentRepository.findBySectionId(sectionId);
+        List<Assignment> assignments = assignmentRepository.findBySectionsId(sectionId).stream()
+            .filter(assignment -> assignment.getStatus() == Assignment.Status.PUBLISHED)
+            .collect(Collectors.toList());
+
+        List<Submission> submissions = assignments.stream()
+            .flatMap(assignment -> submissionRepository.findByAssignmentId(assignment.getId()).stream())
+            .filter(submission -> submission.getStudent() != null
+                && submission.getStudent().getSection() != null
+                && submission.getStudent().getSection().getId().equals(sectionId))
+            .collect(Collectors.toList());
+
+        Double completionRate = null;
+        if (!students.isEmpty() && !assignments.isEmpty()) {
+            completionRate = submissions.size() * 100.0 / (students.size() * assignments.size());
+        }
+
+        List<Long> topStudentIds = submissions.stream()
+            .filter(submission -> submission.getStatus() == Submission.Status.GRADED && submission.getMarks() != null)
+            .collect(Collectors.groupingBy(submission -> submission.getStudent().getId(), Collectors.averagingInt(Submission::getMarks)))
+            .entrySet().stream()
+            .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
+            .limit(5)
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toList());
+
+        List<SectionAnalyticsDTO.ScoreHistogramBucket> scoreHistogram = buildScoreHistogram(submissions);
+
+        List<SectionAnalyticsDTO.LanguageUsageStat> languageUsage = submissions.stream()
+            .filter(submission -> submission.getAssignment() != null && submission.getAssignment().getLanguage() != null)
+            .collect(Collectors.groupingBy(
+                submission -> submission.getAssignment().getLanguage().getId(),
+                Collectors.counting()
+            ))
+            .entrySet().stream()
+            .map(entry -> new SectionAnalyticsDTO.LanguageUsageStat(entry.getKey(), entry.getValue()))
+            .sorted(Comparator.comparing(SectionAnalyticsDTO.LanguageUsageStat::languageId))
+            .collect(Collectors.toList());
+
+        return new SectionAnalyticsDTO(sectionId, completionRate, topStudentIds, scoreHistogram, languageUsage);
+    }
+
+    private List<SectionAnalyticsDTO.ScoreHistogramBucket> buildScoreHistogram(List<Submission> submissions) {
+        String[] buckets = {"0-20", "21-40", "41-60", "61-80", "81-100"};
+        long[] counts = new long[buckets.length];
+        submissions.stream()
+            .filter(submission -> submission.getMarks() != null)
+            .forEach(submission -> counts[scoreBucketIndex(submission.getMarks())]++);
+        List<SectionAnalyticsDTO.ScoreHistogramBucket> histogram = new ArrayList<>(buckets.length);
+        for (int i = 0; i < buckets.length; i++) {
+            histogram.add(new SectionAnalyticsDTO.ScoreHistogramBucket(buckets[i], counts[i]));
+        }
+        return histogram;
+    }
+
+    private int scoreBucketIndex(int marks) {
+        if (marks <= 20) {
+            return 0;
+        }
+        if (marks <= 40) {
+            return 1;
+        }
+        if (marks <= 60) {
+            return 2;
+        }
+        if (marks <= 80) {
+            return 3;
+        }
+        return 4;
     }
 }

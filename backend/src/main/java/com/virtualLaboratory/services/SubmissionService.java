@@ -8,9 +8,13 @@ import com.virtualLaboratory.dto.submission.SubmissionRunResponse;
 import com.virtualLaboratory.entities.User;
 import com.virtualLaboratory.entities.academics.Student;
 import com.virtualLaboratory.entities.codingLaboratoryEntities.Assignment;
+import com.virtualLaboratory.entities.codingLaboratoryEntities.ProgrammingLanguage;
 import com.virtualLaboratory.entities.codingLaboratoryEntities.Submission;
 import com.virtualLaboratory.mapper.SubmissionMapper;
+import com.virtualLaboratory.config.Judge0Properties;
+import com.virtualLaboratory.dto.judge0.Judge0SubmissionResponse;
 import com.virtualLaboratory.repository.AssignmentRepository;
+import com.virtualLaboratory.repository.ProgrammingLanguageRepository;
 import com.virtualLaboratory.repository.SubmissionRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -20,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,17 +33,26 @@ import java.util.stream.Collectors;
 public class SubmissionService {
     private final SubmissionRepository submissionRepository;
     private final AssignmentRepository assignmentRepository;
+    private final ProgrammingLanguageRepository programmingLanguageRepository;
     private final CurrentUserService currentUserService;
     private final SubmissionMapper submissionMapper;
+    private final Judge0IntegrationService judge0IntegrationService;
+    private final Judge0Properties judge0Properties;
 
     public SubmissionService(SubmissionRepository submissionRepository,
                              AssignmentRepository assignmentRepository,
+                             ProgrammingLanguageRepository programmingLanguageRepository,
                              CurrentUserService currentUserService,
-                             SubmissionMapper submissionMapper) {
+                             SubmissionMapper submissionMapper,
+                             Judge0IntegrationService judge0IntegrationService,
+                             Judge0Properties judge0Properties) {
         this.submissionRepository = submissionRepository;
         this.assignmentRepository = assignmentRepository;
+        this.programmingLanguageRepository = programmingLanguageRepository;
         this.currentUserService = currentUserService;
         this.submissionMapper = submissionMapper;
+        this.judge0IntegrationService = judge0IntegrationService;
+        this.judge0Properties = judge0Properties;
     }
 
     public Page<SubmissionDTO> getSubmissions(Long assignmentId, String status, Long sectionId, Pageable pageable) {
@@ -97,7 +111,27 @@ public class SubmissionService {
     }
 
     public SubmissionRunResponse run(SubmissionRunRequest request) {
-        return new SubmissionRunResponse("", "", 0, 0L);
+        User user = currentUserService.getCurrentUser();
+        if (user.getRole() != User.Role.STUDENT) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only students can run code");
+        }
+
+        validateInputSize(request);
+
+        ProgrammingLanguage language = programmingLanguageRepository.findById(request.languageId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Language not found"));
+        if (!language.isActive()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Language is not active");
+        }
+
+        Integer judge0LanguageId = resolveJudge0LanguageId(language);
+        Judge0SubmissionResponse judge0Response = judge0IntegrationService.submitAndWait(
+            request.code(),
+            judge0LanguageId,
+            request.stdin()
+        );
+
+        return toRunResponse(judge0Response);
     }
 
     public SubmissionDTO getSubmission(Long id) {
@@ -137,5 +171,59 @@ public class SubmissionService {
     public List<SubmissionDTO> getMySubmissions() {
         Student student = currentUserService.getCurrentStudent();
         return submissionRepository.findByStudentId(student.getId()).stream().map(submissionMapper::toDto).collect(Collectors.toList());
+    }
+
+    private void validateInputSize(SubmissionRunRequest request) {
+        int sourceCodeBytes = request.code().getBytes(StandardCharsets.UTF_8).length;
+        if (sourceCodeBytes > judge0Properties.getMaxSourceCodeBytes()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Source code exceeds maximum size");
+        }
+
+        if (request.stdin() != null) {
+            int stdinBytes = request.stdin().getBytes(StandardCharsets.UTF_8).length;
+            if (stdinBytes > judge0Properties.getMaxStdinBytes()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stdin exceeds maximum size");
+            }
+        }
+    }
+
+    private Integer resolveJudge0LanguageId(ProgrammingLanguage language) {
+        Integer judge0LanguageId = language.getJudge0LanguageId();
+        if (judge0LanguageId == null) {
+            judge0LanguageId = judge0Properties.getLanguageMapping().get(language.getId());
+        }
+        if (judge0LanguageId == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Language not configured for execution");
+        }
+        return judge0LanguageId;
+    }
+
+    private SubmissionRunResponse toRunResponse(Judge0SubmissionResponse response) {
+        String stdout = response.stdout() != null ? response.stdout() : "";
+        String stderr = response.stderr() != null ? response.stderr() : "";
+        if (response.compileOutput() != null && !response.compileOutput().isBlank()) {
+            stderr = stderr.isBlank() ? response.compileOutput() : stderr + "\n" + response.compileOutput();
+        }
+
+        int exitCode = response.exitCode() != null ? response.exitCode() : defaultExitCode(response);
+        long executionMs = parseExecutionMs(response.time());
+
+        return new SubmissionRunResponse(stdout, stderr, exitCode, executionMs);
+    }
+
+    private int defaultExitCode(Judge0SubmissionResponse response) {
+        Integer statusId = response.status() != null ? response.status().id() : null;
+        return Integer.valueOf(3).equals(statusId) ? 0 : 1;
+    }
+
+    private long parseExecutionMs(String time) {
+        if (time == null || time.isBlank()) {
+            return 0L;
+        }
+        try {
+            return Math.round(Double.parseDouble(time) * 1000);
+        } catch (NumberFormatException ex) {
+            return 0L;
+        }
     }
 }

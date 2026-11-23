@@ -6,7 +6,7 @@
 // When using the real backend ensure it's running on localhost:8080.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const DEMO_MODE = true  // ← set to false to use real backend
+export const DEMO_MODE = false  // ← set to true to use mock/demo backend
 
 import {
   mockAuthService,
