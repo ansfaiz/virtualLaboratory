@@ -10,7 +10,7 @@ import { useFetch, useMutation } from '../../hooks'
 import { languageService } from '../../services'
 import Skeleton from '../../components/ui/Skeleton'
 
-const EMPTY = { name: '', version: '', extension: '', icon: '' }
+const EMPTY = { name: '', version: '', extension: '', icon: '', judge0LanguageId: '' }
 
 export default function LanguagesPage() {
   const toast = useToast()
@@ -27,7 +27,7 @@ export default function LanguagesPage() {
   const { mutate: toggleLang } = useMutation(({ id, active }) => languageService.update(id, { active }))
 
   const openCreate = () => { setForm(EMPTY); setModal({ open: true, mode: 'create', item: null }) }
-  const openEdit   = (item) => { setForm({ name: item.name, version: item.version, extension: item.extension, icon: item.icon ?? '' }); setModal({ open: true, mode: 'edit', item }) }
+  const openEdit   = (item) => { setForm({ name: item.name, version: item.version, extension: item.extension, icon: item.icon ?? '', judge0LanguageId: item.judge0LanguageId ?? '' }); setModal({ open: true, mode: 'edit', item }) }
 
   const handleSubmit = async () => {
     try {
@@ -36,8 +36,8 @@ export default function LanguagesPage() {
         await createLang({ ...form, active: true })
         toast('Language added', 'success')
       } else {
-        // PUT /languages/:id { version?, active?, icon? } → LanguageDTO
-        await updateLang({ version: form.version, icon: form.icon })
+        // PUT /languages/:id { version?, active?, icon?, judge0LanguageId? } → LanguageDTO
+        await updateLang({ version: form.version, icon: form.icon, judge0LanguageId: form.judge0LanguageId ? Number(form.judge0LanguageId) : null })
         toast('Language updated', 'success')
       }
       setModal({ open: false, mode: 'create', item: null })
@@ -117,6 +117,13 @@ export default function LanguagesPage() {
           </div>
           <Input label="Runtime / Version" placeholder="3.12.0" value={form.version} onChange={e => setForm(f => ({ ...f, version: e.target.value }))} />
           {modal.mode === 'create' && <Input label="File Extension" placeholder=".py" value={form.extension} onChange={e => setForm(f => ({ ...f, extension: e.target.value }))} />}
+          <Input
+            label="Judge0 Language ID"
+            type="number"
+            placeholder="e.g. 71 (Python 3)"
+            value={form.judge0LanguageId}
+            onChange={e => setForm(f => ({ ...f, judge0LanguageId: e.target.value }))}
+          />
         </div>
       </Modal>
 

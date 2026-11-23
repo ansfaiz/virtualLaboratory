@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { authService } from '../services'
+import { authService, languageService } from '../services'
+import { setLanguageCatalog } from '../utils/dataHelpers'
 
 const AuthContext = createContext(null)
 
@@ -17,6 +18,15 @@ export function AuthProvider({ children }) {
     }
     setLoading(false)
   }, [])
+
+  // Once a user session is active, seed the live language catalog so
+  // getLanguageName() uses real backend IDs (no-op in DEMO_MODE — mock catalog is used).
+  useEffect(() => {
+    if (!user) return
+    languageService.getAll()
+      .then(r => setLanguageCatalog(r.data ?? r))
+      .catch(() => { /* non-fatal — falls back to mock catalog */ })
+  }, [user?.id])
 
   // POST /auth/login → { user: UserDTO, token }
   const login = useCallback(async (credentials) => {

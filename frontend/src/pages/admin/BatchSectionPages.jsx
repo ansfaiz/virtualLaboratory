@@ -114,13 +114,13 @@ export function SectionsPage() {
   const [deleteId, setDeleteId] = useState(null)
 
   // GET /sections → Page<SectionDTO> { id, name, batchId, teacherId, studentCount, students[] }
-  const { data: sectionsPage, loading, refetch } = useFetch(() => sectionService.getAll({ page: 0, size: 50 }))
+  const { data: sectionsPage, loading, refetch } = useFetch(() => sectionService.getAll({ page: 0, size: 50 }).then(r => r.data))
   const sections = sectionsPage?.content ?? []
 
   // GET /batches for the batch selector
   const { data: batches = [] } = useFetch(() => batchService.getAll().then(r => r.data))
   // GET /users?role=TEACHER for the teacher selector
-  const { data: teachersPage } = useFetch(() => userService.getAll({ role: 'TEACHER', size: 100 }))
+  const { data: teachersPage } = useFetch(() => userService.getAll({ role: 'TEACHER', size: 100 }).then(r => r.data))
   const teachers = teachersPage?.content ?? []
 
   const { mutate: createSection, loading: creating } = useMutation(sectionService.create)

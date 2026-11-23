@@ -38,3 +38,18 @@ virtual_lab_audit_report_v2.md
 .DS_Store
 /backend_assessment_report.md
 /phase1_submissiondto_report.md
+/phase2_assignment_edit_assessment.md
+/phase3_persistent_token_blacklist_design.md
+phase3_persistent_token_blacklist_report.md
+phase4_judge0_integration_design.md
+/phase4_judge0_integration_design.md
+/Users/cortane/Desktop/project_Full_stack/virtualLaboratory/backend/src/main/resources/.env
+/phase4_judge0_design_final.md
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+/Users/cortane/Desktop/project_Full_stack/virtualLaboratory/backend/src/main/resources/.env

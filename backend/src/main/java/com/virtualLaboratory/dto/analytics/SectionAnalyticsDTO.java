@@ -6,7 +6,17 @@ public record SectionAnalyticsDTO(
     long sectionId,
     Double completionRate,
     List<Long> topStudentIds,
-    List<Integer> scoreHistogram,
-    List<String> languageUsage
+    List<ScoreHistogramBucket> scoreHistogram,
+    List<LanguageUsageStat> languageUsage
 ) {
+
+    public record ScoreHistogramBucket(
+        String bucket,
+        long count
+    ) {}
+
+    public record LanguageUsageStat(
+        Long languageId,
+        Long count
+    ) {}
 }
