@@ -6,6 +6,7 @@ public record LanguageDTO(
     String version,
     String extension,
     String icon,
-    boolean active
+    boolean active,
+    Integer judge0LanguageId
 ) {
 }

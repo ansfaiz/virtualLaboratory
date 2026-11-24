@@ -43,8 +43,8 @@ export default function PerformancePage() {
   // scoreHistogram: array of { bucket, count } from the API
   const histogramData = sectionStats?.scoreHistogram ?? []
   // languageUsage: array of { languageId, count }
-  const languageData  = sectionStats?.languageUsage  ?? []
-  const topStudents   = sectionStats?.topStudentIds  ?? []
+  const languageData = sectionStats?.languageUsage ?? []
+  const topStudents = sectionStats?.topStudentIds ?? []
 
   return (
     <div className="space-y-6 animate-slide-up">
@@ -147,12 +147,11 @@ export default function PerformancePage() {
             {/* topStudentIds: number[] — display IDs since backend gives IDs only */}
             {topStudents.map((studentId, i) => (
               <div key={studentId} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm font-mono ${
-                  i === 0 ? 'bg-amber-400 text-white' :
-                  i === 1 ? 'bg-slate-300 dark:bg-slate-600 text-white' :
-                  i === 2 ? 'bg-amber-700 text-white' :
-                  'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                }`}>{i + 1}</div>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm font-mono ${i === 0 ? 'bg-amber-400 text-white' :
+                    i === 1 ? 'bg-slate-300 dark:bg-slate-600 text-white' :
+                      i === 2 ? 'bg-amber-700 text-white' :
+                        'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                  }`}>{i + 1}</div>
                 <Avatar name={`Student ${studentId}`} size="sm" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-slate-800 dark:text-slate-200">Student #{studentId}</p>

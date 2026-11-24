@@ -8,6 +8,7 @@ public record LanguageCreateRequest(
     @NotBlank String version,
     @NotBlank String extension,
     boolean active,
-    String icon
+    String icon,
+    Integer judge0LanguageId
 ) {
 }

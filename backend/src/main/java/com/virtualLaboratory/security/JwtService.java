@@ -1,6 +1,7 @@
 package com.virtualLaboratory.security;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
@@ -10,6 +11,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
+import java.time.Instant;
 import java.util.Date;
 import java.util.Map;
 
@@ -18,7 +20,7 @@ public class JwtService {
     private final Key signingKey;
     private final long expirationMs;
 
-    public JwtService(@Value("${app.jwt.secret:dev-secret-key-dev-secret-key-dev-secret-key}") String secret,
+    public JwtService(@Value("${app.jwt.secret}") String secret,
                       @Value("${app.jwt.expiration-ms:86400000}") long expirationMs) {
         this.signingKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(toBase64(secret)));
         this.expirationMs = expirationMs;
@@ -36,6 +38,14 @@ public class JwtService {
 
     public String extractUsername(String token) {
         return extractAllClaims(token).getSubject();
+    }
+
+    public Instant extractExpiration(String token) {
+        try {
+            return extractAllClaims(token).getExpiration().toInstant();
+        } catch (ExpiredJwtException ex) {
+            return ex.getClaims().getExpiration().toInstant();
+        }
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {

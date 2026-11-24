@@ -106,6 +106,33 @@ The Virtual Laboratory Platform replaces the fragmented workflow with a **single
 | **Auditability** | Timestamped submissions, status state machines, and per-role analytics endpoints |
 
 Every feature maps directly to a real workflow pain point — there are no speculative features, only purposeful engineering decisions.
+Academic institutions delivering programming courses face a structural workflow problem that grows worse at scale:
+
+| Pain Point | Impact at Scale |
+|---|---|
+| Assignments distributed via email or chat | No versioning, no delivery confirmation, no central record |
+| Submissions collected as ZIP files or Drive links | Manual sorting, error-prone, no audit trail |
+| Grading done on paper or ad-hoc spreadsheets | No structured feedback loop, impossible to query |
+| Performance data siloed per teacher | No institution-wide view; no per-section analytics |
+| No access control on grade data | Students can see each other's marks; teachers see unrelated data |
+| No standardized code execution record | No `stdout`, `stderr`, or exit code captured |
+
+For an institution managing 500+ students across 20+ sections, these gaps create **serious operational, academic integrity, and scalability problems**.
+
+---
+
+## 💡 Solution
+
+The Virtual Laboratory Platform replaces the fragmented manual workflow with a **centralized, API-driven platform** governed by four engineering principles:
+
+| Principle | Implementation |
+|---|---|
+| **Security-first design** | Stateless JWT + BCrypt + RBAC enforced at SecurityFilterChain and method level |
+| **Explicit role boundaries** | Three distinct roles; all data access is role-scoped at the repository query level |
+| **Typed data contracts** | Full DTO layer; all request/response shapes are explicitly typed and validated |
+| **Lifecycle state machines** | Assignment status (`DRAFT`/`PUBLISHED`) and Submission status (`SUBMITTED`/`GRADED`) modeled as database-persisted enums |
+
+Every API endpoint maps to a real workflow step. There are no speculative features — only purposeful, testable engineering decisions.
 
 ---
 
@@ -358,6 +385,161 @@ src/
 ## 🗄️ Database Design Overview
 
 The database is structured around three domains: **Academic Structure**, **Users/Roles**, and **Laboratory Operations**.
+    REPO --> DB
+    CTRL -.->|"exception"| EXH
+    EXH -.->|"structured JSON error"| FE
+```
+
+### Request Lifecycle
+
+```
+HTTP Request
+    │
+    ▼
+JwtAuthenticationFilter          ← Validates Bearer token, checks blacklist
+    │
+    ▼
+SecurityFilterChain              ← Route-level role enforcement
+    │
+    ▼
+REST Controller                  ← Input binding (@Valid), HTTP status codes
+    │
+    ▼
+Service Layer                    ← Business logic, ownership checks (CurrentUserService)
+    │
+    ▼
+Mapper Layer                     ← Entity → DTO (safe serialization boundary)
+    │
+    ▼
+Repository Layer                 ← JPQL / derived queries, Pageable, role-scoped filters
+    │
+    ▼
+MySQL via Hibernate/JPA          ← ORM-managed persistence
+```
+
+---
+
+## 🔑 Authentication Flow
+
+Authentication is **stateless**. The server issues a signed JWT on login; every subsequent request must present that token. The server does not maintain session state.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant F as JwtAuthenticationFilter
+    participant JS as JwtService
+    participant BL as TokenBlacklistService
+    participant UD as UserDetailsServiceImpl
+    participant SVC as Service Layer
+    participant DB as MySQL
+
+    C->>F: POST /api/auth/login { username, password }
+    F->>DB: SELECT * FROM users WHERE username = ?
+    DB-->>F: User entity
+    F->>F: BCryptPasswordEncoder.matches(raw, hashed)
+    F->>JS: generateToken(UserDetails)
+    JS-->>F: eyJhbGciOiJIUzI1NiJ9...
+    F-->>C: 200 OK { user: UserDTO, token: "eyJ..." }
+
+    Note over C: Stores token in localStorage
+
+    C->>F: GET /api/assignments  Authorization: Bearer eyJ...
+    F->>JS: extractUsername(token)
+    JS-->>F: "john.doe"
+    F->>UD: loadUserByUsername("john.doe")
+    UD->>DB: SELECT * FROM users WHERE username = ?
+    DB-->>UD: User entity
+    F->>JS: isTokenValid(token, userDetails)
+    F->>BL: isBlacklisted(token)
+    BL-->>F: false
+    F->>F: Set SecurityContextHolder Authentication
+    F->>SVC: Route to handler (role check passes)
+    SVC-->>C: 200 OK [ AssignmentDTO... ]
+
+    C->>F: POST /api/auth/logout  Authorization: Bearer eyJ...
+    F->>BL: blacklist(token)
+    F-->>C: 204 No Content
+```
+
+### Token Structure
+
+| Claim | Value | Notes |
+|---|---|---|
+| `sub` | `username` | Used to reload `UserDetails` from DB on each request |
+| `iat` | Issued-at timestamp | Standard JWT claim |
+| `exp` | Issued-at + `app.jwt.expiration-ms` | Default 24 hours |
+| Signature | HMAC-SHA256 | Signed with `app.jwt.secret` (Base64-encoded) |
+
+> Roles are **not** embedded in the token. They are loaded fresh from the database on every request via `UserDetailsServiceImpl`, ensuring that role changes take effect immediately without token invalidation.
+
+---
+
+## 📝 Assignment Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT : POST /api/assignments\nTeacher creates assignment
+
+    DRAFT --> DRAFT : PUT /api/assignments/{id}\nEdit title · description · code · due date · score
+
+    DRAFT --> DRAFT : POST /api/assignments/{id}/sections/{sectionId}\nAdd section distribution
+
+    DRAFT --> PUBLISHED : PUT /api/assignments/{id}/publish\nTeacher publishes — becomes visible to students
+
+    PUBLISHED --> PUBLISHED : POST|DELETE /api/assignments/{id}/sections/{sectionId}\nAdd or remove section scope
+
+    PUBLISHED --> [*] : DELETE /api/assignments/{id}\nPermanent deletion
+
+    note right of DRAFT
+        Hidden from all students.
+        Freely editable.
+        Not yet distributed.
+    end note
+
+    note right of PUBLISHED
+        Visible to enrolled students.
+        Students may submit solutions.
+        Sections remain adjustable.
+    end note
+```
+
+---
+
+## 📤 Submission Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> CODING : Student opens GET /api/assignments/student
+
+    CODING --> EXECUTED : POST /api/submissions/run\nCode sent to execution engine\nstdout · stderr · exitCode returned
+
+    EXECUTED --> CODING : Student iterates on solution
+
+    CODING --> SUBMITTED : POST /api/submissions\nFinal solution submitted\nsubmitAt timestamp recorded
+
+    SUBMITTED --> GRADED : PUT /api/submissions/{id}/grade\nTeacher writes marks + feedback
+
+    GRADED --> [*] : Student views via GET /api/submissions/my\nGrade and feedback visible
+
+    note right of SUBMITTED
+        status = SUBMITTED
+        Visible in teacher's queue.
+        Immutable student code record.
+    end note
+
+    note right of GRADED
+        status = GRADED
+        marks + feedback populated.
+        Student sees result.
+    end note
+```
+
+---
+
+## 🗄️ Database Design
+
+The schema is organized around three domains: **User & Role Identity**, **Academic Structure**, and **Laboratory Operations**.
 
 ```mermaid
 erDiagram
@@ -370,12 +552,14 @@ erDiagram
         enum role
         boolean active
     }
+
     batch {
         bigint id PK
         varchar name
         int year
         date start_date
     }
+
     section {
         bigint id PK
         varchar name
@@ -389,11 +573,27 @@ erDiagram
     teacher {
         bigint id PK FK
     }
+
+    student {
+        bigint id PK
+        bigint section_id FK
+        bigint batch_id FK
+    }
+
+    teacher {
+        bigint id PK
+    }
+
+    admin {
+        bigint id PK
+    }
+
     programming_language {
         bigint id PK
         varchar name
         varchar version
     }
+
     assignment {
         bigint id PK
         varchar title
@@ -405,10 +605,12 @@ erDiagram
         int max_score
         enum status
     }
+
     assignment_sections {
         bigint assignment_id FK
         bigint section_id FK
     }
+
     submission {
         bigint id PK
         bigint assignment_id FK
@@ -430,6 +632,11 @@ erDiagram
     users ||--o| teacher : "extends"
     teacher ||--o{ assignment : "creates"
     programming_language ||--o{ assignment : "used_in"
+    users ||--o| student : "MapsId"
+    users ||--o| teacher : "MapsId"
+    users ||--o| admin : "MapsId"
+    teacher ||--o{ assignment : "authors"
+    programming_language ||--o{ assignment : "specifies"
     assignment }o--o{ section : "assignment_sections"
     assignment ||--o{ submission : "receives"
     student ||--o{ submission : "makes"
@@ -455,6 +662,130 @@ The API surface follows **REST conventions** with consistent patterns across all
 - **Filtering via query params**: `?status=PUBLISHED&sectionId=3` for scoped queries
 - **Validation errors** return a field-level map: `{ "fieldName": "constraint message" }`
 - **No internal entity leakage**: all responses are DTOs — entity implementation details never reach the wire
+### Key Schema Engineering Decisions
+
+| Decision | Rationale |
+|---|---|
+| **Shared PK via `@MapsId` + `@OneToOne`** | `Student`, `Teacher`, and `Admin` share the primary key of `User`. This separates authentication identity from role-specific profile data without duplicating user credentials. |
+| **`@ManyToMany` `assignment_sections` join table** | A single assignment can target multiple sections. Sections can be added or removed from an assignment without touching the assignment entity or triggering cascades. |
+| **`@Lob` on `code`, `stdout`, `stderr`, `description`, `starterCode`** | Prevents MySQL `VARCHAR(255)` truncation for arbitrarily large code submissions and execution output. Hibernate maps these to `LONGTEXT`. |
+| **`@Enumerated(EnumType.STRING)` on all status fields** | Ordinal storage is fragile against enum reordering. String storage is human-readable in the database and safe across refactors. |
+| **`boolean active` on `User`** | Supports soft-delete (deactivation) without cascading deletion of historical submissions and grades. |
+| **`executionMs` on `Submission`** | Records server-side execution latency per run — useful for future performance-based grading or SLA monitoring. |
+
+---
+
+## 🔧 Backend Engineering Deep Dive
+
+### Package Structure & Layered Responsibility
+
+```
+com.virtualLaboratory
+├── config/
+│   └── SecurityConfig.java          # SecurityFilterChain, CORS, BCrypt, AuthManager
+├── controllers/                     # HTTP layer — thin, stateless, delegate to services
+│   ├── AuthController.java
+│   ├── UserController.java
+│   ├── BatchController.java
+│   ├── SectionController.java
+│   ├── LanguageController.java
+│   ├── AssignmentController.java
+│   ├── SubmissionController.java
+│   └── AnalyticsController.java
+├── services/                        # Business logic — all rules live here
+│   ├── AuthService.java
+│   ├── UserService.java
+│   ├── BatchService.java
+│   ├── SectionService.java
+│   ├── LanguageService.java
+│   ├── AssignmentService.java
+│   ├── SubmissionService.java
+│   ├── AnalyticsService.java
+│   └── CurrentUserService.java      # Extracts authenticated principal from SecurityContext
+├── repository/                      # Spring Data JPA — queries, pagination, role-scoped filters
+│   ├── UserRepository.java
+│   ├── StudentRepository.java
+│   ├── TeacherRepository.java
+│   ├── AdminRepository.java
+│   ├── BatchRepository.java
+│   ├── SectionRepository.java
+│   ├── AssignmentRepository.java
+│   ├── SubmissionRepository.java
+│   └── ProgrammingLanguageRepository.java
+├── entities/                        # JPA domain model — four sub-packages by domain
+│   ├── User.java
+│   ├── academicStructureEntities/   # Batch, Section
+│   ├── academics/                   # Admin, Teacher, Student
+│   └── codingLaboratoryEntities/    # Assignment, Submission, ProgrammingLanguage
+├── dto/                             # Typed API contracts — 8 domain sub-packages
+│   ├── auth/        (LoginRequest, LoginResponse)
+│   ├── user/        (UserDTO, UserCreateRequest, UserUpdateRequest, PasswordResetRequest)
+│   ├── batch/       (BatchDTO, BatchCreateRequest)
+│   ├── section/     (SectionDTO, SectionCreateRequest)
+│   ├── language/    (LanguageDTO, LanguageCreateRequest)
+│   ├── assignment/  (AssignmentDTO, AssignmentCreateRequest, AssignmentUpdateRequest,
+│   │                 AssignmentWithStatusDTO)
+│   ├── submission/  (SubmissionDTO, SubmissionCreateRequest, SubmissionGradeRequest,
+│   │                 SubmissionRunRequest, SubmissionRunResponse)
+│   └── analytics/   (AdminAnalyticsDTO, TeacherAnalyticsDTO,
+│                     StudentAnalyticsDTO, SectionAnalyticsDTO)
+├── mapper/                          # Entity ↔ DTO conversion — no entity reaches HTTP response
+│   ├── UserMapper.java
+│   ├── AssignmentMapper.java
+│   ├── SubmissionMapper.java
+│   ├── BatchMapper.java
+│   ├── SectionMapper.java
+│   └── LanguageMapper.java
+├── security/                        # JWT infrastructure
+│   ├── JwtService.java              # Token generation, validation, claim extraction
+│   ├── JwtAuthenticationFilter.java # OncePerRequestFilter — intercepts every request
+│   ├── TokenBlacklistService.java   # In-memory revocation store
+│   └── UserDetailsServiceImpl.java  # Loads UserDetails from DB by username
+└── exception/
+    ├── ApiExceptionHandler.java     # @RestControllerAdvice — catches all exception types
+    ├── ResourceNotFoundException.java
+    ├── BadRequestException.java
+    ├── ConflictException.java
+    └── UnauthorizedException.java
+```
+
+### Critical Engineering Decisions
+
+**1. Constructor Injection Throughout**
+All Spring beans use constructor injection exclusively. No `@Autowired` field injection. This enforces compile-time dependency resolution, enables proper unit testing without Spring context, and makes the dependency graph explicit and immutable.
+
+**2. `CurrentUserService` — Separation of HTTP and Business Concerns**
+A dedicated `CurrentUserService` extracts the authenticated principal from `SecurityContextHolder`. Business services (`AssignmentService`, `SubmissionService`, etc.) call this service to get the current user's identity without importing any `HttpServletRequest` or Spring MVC concerns. This keeps service classes independently testable.
+
+**3. Role-Scoped Repository Queries**
+Data visibility is enforced at the **query level**, not by post-fetch filtering. For example, `AssignmentService.getTeacherAssignments()` passes `teacherId` directly into the repository query — a teacher structurally cannot receive another teacher's data, regardless of what parameters are passed.
+
+**4. DTO Pattern with Dedicated Mapper Layer**
+No JPA entity ever appears in an HTTP response. The `Mapper` layer converts entities to flat, serialization-safe DTOs before they reach the controller. This prevents:
+- `LazyInitializationException` from Hibernate proxies
+- Infinite recursion from bidirectional JPA relationships
+- Accidental exposure of internal fields (e.g., hashed passwords)
+
+**5. Pageable on All List Endpoints**
+Spring's `Pageable` is accepted as a parameter on every collection endpoint. Clients specify `?page=0&size=20&sort=submitAt,desc` at the HTTP layer — the service layer passes it directly to the repository. Zero backend changes are needed to adjust page size or sort order.
+
+**6. Status Enums as State Machines**
+`Assignment.Status` (`DRAFT`, `PUBLISHED`) and `Submission.Status` (`SUBMITTED`, `GRADED`) are enforced as database-persisted string enums. State transitions are validated in the service layer — e.g., a teacher cannot unpublish an assignment that has submissions, and a student cannot resubmit a graded solution.
+
+**7. `@RestControllerAdvice` Global Exception Handler**
+`ApiExceptionHandler` intercepts seven distinct exception types:
+
+| Exception Type | HTTP Status | Use Case |
+|---|---|---|
+| `ResourceNotFoundException` | 404 | Entity not found by ID |
+| `BadRequestException` | 400 | Invalid business operation |
+| `ConflictException` | 409 | Duplicate resource or state conflict |
+| `UnauthorizedException` | 401 | Authentication or ownership failure |
+| `MethodArgumentNotValidException` | 400 | Bean validation failure (field-level map) |
+| `ResponseStatusException` | Dynamic | Framework-level HTTP errors |
+| `Exception` (fallback) | 500 | All uncaught exceptions — masked to "Internal server error" |
+
+All responses follow the same envelope: `{ "error": "message", "message": "message" }`. No stack traces ever reach the HTTP response.
 
 ---
 
@@ -515,6 +846,142 @@ sequenceDiagram
 | **Results Page** | Graded submissions with marks, feedback, and submission timeline |
 
 > 📷 *Screenshots can be added to a `/screenshots` directory and embedded here.*
+### Multi-Layer Security Model
+
+```mermaid
+flowchart LR
+    REQ["Incoming HTTP Request"] --> CORS
+    CORS["CORS Filter\nOrigin allowlist"] --> JWT
+    JWT["JwtAuthenticationFilter\nToken extraction + validation\nBlacklist check"] --> SC
+    SC["SecurityFilterChain\nRoute-level role rules\n@EnableMethodSecurity"] --> CTRL
+    CTRL["Controller + Service\nOwnership checks via\nCurrentUserService"] --> DB
+    DB["MySQL — role-scoped\nrepository queries"]
+```
+
+| Security Layer | Mechanism | What It Protects Against |
+|---|---|---|
+| **CORS** | `CorsConfigurationSource` — explicit origin allowlist | Cross-origin requests from unauthorized domains |
+| **Transport Auth** | JWT Bearer, HMAC-SHA256 signed | Unauthenticated API access |
+| **Password Storage** | `BCryptPasswordEncoder` (Spring Security default) | Credential theft via DB compromise |
+| **Session Strategy** | `SessionCreationPolicy.STATELESS` | Session fixation, CSRF via cookie sessions |
+| **Token Revocation** | `TokenBlacklistService` in-memory store | Continued access after logout |
+| **Route RBAC** | `SecurityFilterChain` per-path `hasRole()` rules | Wrong-role endpoint access |
+| **Method RBAC** | `@EnableMethodSecurity` + `@PreAuthorize` | Fine-grained per-operation authorization |
+| **Ownership Enforcement** | `CurrentUserService` in business logic | Teachers accessing other teachers' data |
+| **Input Validation** | `jakarta.validation` on all request DTOs | Malformed input, constraint violations |
+| **Error Masking** | Fallback `Exception` handler → HTTP 500 + generic message | Stack trace leakage in production |
+
+### `SecurityConfig` Highlights
+
+```java
+http
+  .csrf(csrf -> csrf.disable())                             // Stateless — no CSRF needed
+  .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+  .sessionManagement(s -> s.sessionCreationPolicy(STATELESS))
+  .authorizeHttpRequests(auth -> auth
+      .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+      .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
+      .requestMatchers("/api/users/**").permitAll()          // Registration is public
+      .requestMatchers("/error").permitAll()
+      .anyRequest().authenticated()
+  )
+  .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+```
+
+---
+
+## 📡 REST API Overview
+
+All endpoints are prefixed with `/api`. All protected endpoints require `Authorization: Bearer <token>`.
+
+### Authentication
+
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `POST` | `/auth/login` | Public | Authenticate; receive JWT + UserDTO |
+| `POST` | `/auth/logout` | Bearer | Blacklist token; immediate logout |
+| `GET` | `/auth/me` | Bearer | Get current authenticated user |
+
+### User Management
+
+| Method | Endpoint | Role | Description |
+|---|---|---|---|
+| `POST` | `/users` | Public | Create user account |
+| `GET` | `/users` | Admin | List users (paginated; filter by `role`, `batchId`) |
+| `GET` | `/users/{id}` | Admin | Get user by ID |
+| `PUT` | `/users/{id}` | Admin | Update user details |
+| `DELETE` | `/users/{id}` | Admin | Deactivate user |
+| `PUT` | `/users/{id}/password` | Admin | Reset user password |
+
+### Batch & Section Management
+
+| Method | Endpoint | Role | Description |
+|---|---|---|---|
+| `GET` | `/batches` | Admin | List all batches |
+| `POST` | `/batches` | Admin | Create batch |
+| `PUT` | `/batches/{id}` | Admin | Update batch |
+| `DELETE` | `/batches/{id}` | Admin | Delete batch |
+| `GET` | `/sections` | Admin | List sections (filter by `batchId`) |
+| `POST` | `/sections` | Admin | Create section |
+| `PUT` | `/sections/{id}` | Admin | Update section |
+| `DELETE` | `/sections/{id}` | Admin | Delete section |
+| `GET` | `/sections/{id}/students` | Admin | List enrolled students |
+| `POST` | `/sections/{id}/students/{studentId}` | Admin | Enroll student |
+| `DELETE` | `/sections/{id}/students/{studentId}` | Admin | Remove student |
+
+### Assignment Management
+
+| Method | Endpoint | Role | Description |
+|---|---|---|---|
+| `GET` | `/assignments` | Teacher | List own assignments (paginated; filter by `status`, `sectionId`) |
+| `POST` | `/assignments` | Teacher | Create assignment (status: `DRAFT`) |
+| `GET` | `/assignments/{id}` | Teacher | Get assignment details |
+| `PUT` | `/assignments/{id}` | Teacher | Update assignment |
+| `DELETE` | `/assignments/{id}` | Teacher | Delete assignment |
+| `PUT` | `/assignments/{id}/publish` | Teacher | Transition status to `PUBLISHED` |
+| `POST` | `/assignments/{id}/sections/{sectionId}` | Teacher | Assign to a section |
+| `DELETE` | `/assignments/{id}/sections/{sectionId}` | Teacher | Remove from a section |
+| `GET` | `/assignments/student` | Student | Get published assignments for own section |
+| `GET` | `/assignments/{id}/submissions` | Teacher | List submissions for an assignment |
+
+### Submission Management
+
+| Method | Endpoint | Role | Description |
+|---|---|---|---|
+| `POST` | `/submissions/run` | Student | Execute code; returns `stdout`, `stderr`, `exitCode`, `executionMs` |
+| `POST` | `/submissions` | Student | Formally submit solution (status: `SUBMITTED`) |
+| `GET` | `/submissions` | Teacher | List submissions (paginated; filter by `assignmentId`, `status`, `sectionId`) |
+| `GET` | `/submissions/{id}` | Teacher / Student | Get submission detail |
+| `PUT` | `/submissions/{id}/grade` | Teacher | Write marks + feedback (status → `GRADED`) |
+| `GET` | `/submissions/my` | Student | Get own submission history |
+
+### Analytics
+
+| Method | Endpoint | Role | Description |
+|---|---|---|---|
+| `GET` | `/analytics/admin` | Admin | Platform-wide aggregation |
+| `GET` | `/analytics/teacher` | Teacher | Class-level stats (filter by `sectionId`) |
+| `GET` | `/analytics/student` | Student | Personal performance stats |
+| `GET` | `/analytics/sections/{id}` | Teacher | Section-level performance breakdown |
+
+### Programming Languages
+
+| Method | Endpoint | Role | Description |
+|---|---|---|---|
+| `GET` | `/languages` | All | List registered languages |
+| `POST` | `/languages` | Admin | Register new language |
+| `PUT` | `/languages/{id}` | Admin | Update language record |
+| `DELETE` | `/languages/{id}` | Admin | Remove language |
+
+### API Design Principles
+
+- **Resource-based URLs**: `/api/{resource}` and `/api/{resource}/{id}` — no verbs in paths
+- **HTTP verb semantics**: `GET` reads, `POST` creates, `PUT` full updates, `DELETE` removes
+- **Uniform error contract**: all failures → `{ "error": "...", "message": "..." }` with correct status code
+- **Field-level validation errors**: `{ "fieldName": "constraint message" }` on 400 responses
+- **Pagination**: Spring `Pageable` (`?page=0&size=20&sort=field,direction`) on all collections
+- **Filtering via query params**: `?status=PUBLISHED&sectionId=3` for scoped queries
+- **No entity leakage**: all responses are DTO instances — internal fields never reach the wire
 
 ---
 
@@ -550,6 +1017,32 @@ sequenceDiagram
 | Lucide React | 0.400.0 | Icon library |
 | date-fns | 3.6.0 | Date formatting and parsing |
 | clsx | 2.1.1 | Conditional class name utility |
+### Backend (Primary)
+
+| Technology | Version | Role |
+|---|---|---|
+| **Java** | 21 (LTS) | Language runtime |
+| **Spring Boot** | 3.2.2 | Application framework, auto-configuration |
+| **Spring Security** | 6.x | Authentication, authorization, filter pipeline |
+| **Spring Data JPA** | 3.2.x | Repository abstraction, derived & JPQL queries |
+| **Hibernate** | 6.x | ORM engine, DDL generation, session management |
+| **JJWT** (`io.jsonwebtoken`) | 0.11.5 | JWT generation, parsing, HMAC-SHA256 signing |
+| **MySQL Connector/J** | Runtime | JDBC driver for MySQL 8 |
+| **Lombok** | 1.18.44 | Compile-time boilerplate reduction (`@Data`, `@Builder`) |
+| **H2 Database** | Test scope | In-memory DB for integration tests |
+| **Maven** | 3.9.x | Build lifecycle, dependency management |
+
+### Frontend (Presentation Layer)
+
+| Technology | Version | Role |
+|---|---|---|
+| **React** | 18.3.1 | UI component model |
+| **Vite** | 5.3.4 | Build tool, HMR dev server |
+| **React Router DOM** | 6.26.0 | Client-side routing with nested layouts |
+| **Tailwind CSS** | 3.4.6 | Utility-first styling |
+| **Axios** | 1.7.2 | HTTP client with JWT interceptor |
+| **@monaco-editor/react** | 4.6.0 | In-browser VS Code editor |
+| **Recharts** | 2.12.7 | Analytics chart components |
 
 ---
 
@@ -558,14 +1051,14 @@ sequenceDiagram
 ```
 virtualLaboratory/
 │
-├── backend/                          # Spring Boot application
+├── backend/                                  ← Spring Boot application (PRIMARY)
 │   ├── pom.xml
 │   └── src/
 │       ├── main/
 │       │   ├── java/com/virtualLaboratory/
 │       │   │   ├── VirtualLaboratoryApplication.java
 │       │   │   ├── config/
-│       │   │   │   └── SecurityConfig.java           # CORS, filter chain, beans
+│       │   │   │   └── SecurityConfig.java
 │       │   │   ├── controllers/
 │       │   │   │   ├── AuthController.java
 │       │   │   │   ├── UserController.java
@@ -617,6 +1110,14 @@ virtualLaboratory/
 │       │   │   │   ├── assignment/# AssignmentDTO, AssignmentCreateRequest, ...
 │       │   │   │   ├── submission/# SubmissionDTO, SubmissionCreateRequest, ...
 │       │   │   │   └── analytics/ # AdminAnalyticsDTO, TeacherAnalyticsDTO, ...
+│       │   │   │   ├── auth/
+│       │   │   │   ├── user/
+│       │   │   │   ├── batch/
+│       │   │   │   ├── section/
+│       │   │   │   ├── language/
+│       │   │   │   ├── assignment/
+│       │   │   │   ├── submission/
+│       │   │   │   └── analytics/
 │       │   │   ├── mapper/
 │       │   │   │   ├── UserMapper.java
 │       │   │   │   ├── AssignmentMapper.java
@@ -638,6 +1139,7 @@ virtualLaboratory/
 │       └── test/
 │
 └── frontend/                         # React + Vite SPA
+└── frontend/                                 ← React 18 SPA (Presentation Layer)
     ├── package.json
     ├── vite.config.js
     ├── tailwind.config.js
@@ -667,6 +1169,13 @@ virtualLaboratory/
         ├── hooks/
         ├── utils/
         └── styles/
+        ├── App.jsx
+        ├── context/          # AuthContext, ThemeContext
+        ├── components/       # AppShell, ProtectedRoute, ErrorBoundary, UI primitives
+        ├── pages/            # admin/ · teacher/ · student/ · auth/
+        ├── services/         # apiClient.js (Axios + JWT), index.js (all API methods)
+        ├── hooks/
+        └── utils/
 ```
 
 ---
@@ -684,6 +1193,7 @@ Ensure the following are installed on your system:
 | MySQL | 8.0+ | Local instance or Docker |
 | Node.js | 18+ | LTS recommended |
 | npm | 9+ | Bundled with Node.js |
+| Tool | Version | Notes |
 
 ### 1. Clone the Repository
 
@@ -697,6 +1207,11 @@ cd virtualLaboratory
 ```sql
 -- Connect to your MySQL server and run:
 CREATE DATABASE virtual_lab CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- Run against your MySQL 8 instance
+CREATE DATABASE virtual_lab
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
 CREATE USER 'vlab_user'@'localhost' IDENTIFIED BY 'your_secure_password';
 GRANT ALL PRIVILEGES ON virtual_lab.* TO 'vlab_user'@'localhost';
 FLUSH PRIVILEGES;
@@ -720,6 +1235,28 @@ app.jwt.secret=your-256-bit-secret-key-here-minimum-32-characters
 app.jwt.expiration-ms=86400000
 ```
 
+Edit `src/main/resources/application.properties`:
+
+```properties
+# Datasource
+spring.datasource.url=jdbc:mysql://localhost:3306/virtual_lab?useSSL=false&serverTimezone=UTC
+spring.datasource.username=vlab_user
+spring.datasource.password=your_secure_password
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+# JPA / Hibernate
+spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=false
+
+# JWT
+app.jwt.secret=your-256-bit-base64-secret-minimum-32-characters-long
+app.jwt.expiration-ms=86400000
+
+# Server
+server.port=8080
+```
+
 ### 4. Frontend Configuration
 
 ```bash
@@ -728,6 +1265,7 @@ npm install
 ```
 
 Create `.env.local` in the `frontend/` directory:
+Create `frontend/.env.local`:
 
 ```env
 VITE_API_BASE_URL=http://localhost:8080/api
@@ -756,12 +1294,30 @@ VITE_API_BASE_URL=http://localhost:8080/api
 | `VITE_API_BASE_URL` | Full base URL of the backend API | `http://localhost:8080/api` |
 
 > **Demo Mode**: The frontend includes a full mock service layer. Set `DEMO_MODE = true` in `src/services/index.js` to run the entire frontend with realistic mock data — no backend required. This is ideal for portfolio demonstrations.
+### Backend — `application.properties`
+
+| Property | Description | Default |
+|---|---|---|
+| `spring.datasource.url` | MySQL JDBC URL | — |
+| `spring.datasource.username` | Database username | — |
+| `spring.datasource.password` | Database password | — |
+| `spring.jpa.hibernate.ddl-auto` | Schema strategy | `update` |
+| `app.jwt.secret` | HMAC-SHA256 signing key (min. 32 chars) | Dev fallback |
+| `app.jwt.expiration-ms` | Token lifetime in milliseconds | `86400000` (24h) |
+| `server.port` | HTTP server port | `8080` |
+
+### Frontend — `.env.local`
+
+| Variable | Description | Default |
+|---|---|---|
+| `VITE_API_BASE_URL` | Backend REST API base URL | `http://localhost:8080/api` |
 
 ---
 
 ## 🚀 Running Locally
 
 ### Start the Backend
+### Start the Backend (Spring Boot)
 
 ```bash
 cd backend
@@ -1011,6 +1567,39 @@ This project goes beyond a CRUD tutorial. It is a **production-architecture syst
 | **Developer Experience** | Mock service layer enabling offline demo, DEMO_MODE toggle |
 | **Code Quality** | Constructor injection, single-responsibility services, enum state machines |
 | **Scalability Awareness** | Stateless auth, Pageable on all lists, no N+1 queries by design |
+# Using the Maven wrapper (no local Maven install required)
+./mvnw spring-boot:run
+
+# API available at:
+# http://localhost:8080/api
+```
+
+Hibernate will auto-create all tables on first run (`ddl-auto=update`).
+
+### Start the Frontend (React + Vite)
+
+```bash
+cd frontend
+npm run dev
+
+# SPA available at:
+# http://localhost:5173
+```
+
+---
+
+## 📈 Scalability & Production Readiness
+
+| Concern | Current Implementation | Production Path |
+|---|---|---|
+| **Stateless auth** | JWT — no server-side sessions | Trivially horizontally scalable — add instances behind a load balancer with no session affinity |
+| **Token revocation** | In-memory blacklist | Replace with **Redis** for distributed token revocation across multiple instances |
+| **Pagination** | Spring `Pageable` on all collection endpoints | No change needed — query-level pagination is already enforced |
+| **Database connection pooling** | Spring Boot default (HikariCP) | Configure `spring.datasource.hikari.*` for pool sizing in production |
+| **Schema management** | `ddl-auto=update` for development | Switch to `ddl-auto=validate` + **Flyway** or **Liquibase** for production migrations |
+| **Secret management** | `application.properties` | Externalize to environment variables or **AWS Secrets Manager / HashiCorp Vault** |
+| **Logging** | Spring Boot default (`logback`) | Add structured JSON logging (Logstash encoder) for log aggregation pipelines |
+| **Monitoring** | — | Add **Spring Boot Actuator** + **Micrometer** + Prometheus/Grafana |
 
 ---
 
@@ -1046,6 +1635,36 @@ Building this platform provided hands-on, production-pattern experience in:
 | **Docker Compose** | Containerize backend + MySQL for one-command local setup | 🟢 Low |
 | **API Documentation** | Springdoc OpenAPI / Swagger UI auto-generated from controllers | 🟢 Low |
 | **CI/CD Pipeline** | GitHub Actions workflow for build, test, and deployment | 🟢 Low |
+Building this platform provided hands-on experience with production-pattern backend engineering:
+
+- ✅ Implementing **stateless JWT authentication** from scratch in Spring Security 6 (no starter magic)
+- ✅ Configuring `SecurityFilterChain` with route-level rules and method-level `@PreAuthorize`
+- ✅ Designing and enforcing **RBAC** across a multi-role domain with zero cross-role data leakage
+- ✅ Building a **layered Spring Boot application** with clear package boundaries and single responsibility
+- ✅ Implementing the **DTO pattern** with a dedicated Mapper layer as a hard serialization boundary
+- ✅ Designing a **normalized relational schema** with `@ManyToMany`, `@OneToOne` with shared PK (`@MapsId`), and `@Lob`
+- ✅ Writing **global exception handling** with structured JSON error contracts across all failure modes
+- ✅ Modeling **entity state machines** (Assignment and Submission lifecycle) with database-persisted string enums
+- ✅ Using **Spring Data JPA** with derived queries, JPQL, and `Pageable` for scalable data access
+- ✅ Building role-scoped **analytics aggregation** endpoints without leaking cross-role data
+
+---
+
+## 🔮 Future Enhancements
+
+| Feature | Description | Priority |
+|---|---|---|
+| **Real Code Execution Engine** | Integrate with **Judge0** or **Piston API** for sandboxed, multi-language server-side execution with resource limits | 🔴 High |
+| **Redis Token Blacklist** | Replace in-memory `TokenBlacklistService` with Redis for distributed multi-instance deployment | 🔴 High |
+| **Refresh Token Rotation** | Implement sliding-window refresh token flow for extended sessions without re-authentication | 🟡 Medium |
+| **JUnit 5 Test Suite** | Unit tests for all service classes (Mockito), integration tests for controllers (`@SpringBootTest` + TestContainers) | 🟡 Medium |
+| **Flyway Migrations** | Replace `ddl-auto=update` with versioned SQL migration scripts for safe production schema changes | 🟡 Medium |
+| **Spring Boot Actuator** | Health checks, metrics endpoints, and Micrometer integration for Prometheus/Grafana observability | 🟡 Medium |
+| **WebSocket Notifications** | Push notifications to teachers on new submissions; to students when graded | 🟡 Medium |
+| **OpenAPI / Swagger UI** | Auto-generate interactive API documentation from controllers via Springdoc OpenAPI 2 | 🟢 Low |
+| **Docker Compose** | Containerize backend + MySQL + frontend for one-command local environment setup | 🟢 Low |
+| **CI/CD Pipeline** | GitHub Actions: build → test → Docker image → deploy on every push to `main` | 🟢 Low |
+| **Email Notifications** | Spring Mail: notify students on assignment publication, notify teachers on new submissions | 🟢 Low |
 
 ---
 
@@ -1062,6 +1681,15 @@ Building this platform provided hands-on, production-pattern experience in:
 ---
 
 *Built with ☕ Java, ⚛️ React, and a genuine interest in solving real engineering problems.*
+**Md Faiyaz Ansari**
+
+*Java Backend Developer · Spring Boot Engineer · Full-Stack Developer*
+
+[![GitHub](https://img.shields.io/badge/GitHub-ansfaiz-181717?style=for-the-badge&logo=github)](https://github.com/ansfaiz)
+
+<br/>
+
+*Built with ☕ Java 21 + Spring Boot 3 · engineered to production-grade standards.*
 
 </div>
 
@@ -1071,8 +1699,8 @@ Building this platform provided hands-on, production-pattern experience in:
 
 ```
 MIT License
-
-Copyright (c) 2026 Ans Faiz
+ 
+Copyright (c) 2026 Md Faiyaz Ansari
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -1097,6 +1725,6 @@ THE SOFTWARE.
 
 <div align="center">
 
-⭐ **If this project was helpful or impressive, consider giving it a star on GitHub** ⭐
+⭐ **If this project demonstrates engineering quality, consider giving it a star on GitHub** ⭐
 
 </div>
