@@ -11,8 +11,8 @@ import com.virtualLaboratory.entities.codingLaboratoryEntities.Assignment;
 import com.virtualLaboratory.entities.codingLaboratoryEntities.ProgrammingLanguage;
 import com.virtualLaboratory.entities.codingLaboratoryEntities.Submission;
 import com.virtualLaboratory.mapper.SubmissionMapper;
-import com.virtualLaboratory.config.Judge0Properties;
-import com.virtualLaboratory.dto.judge0.Judge0SubmissionResponse;
+//import com.virtualLaboratory.config.Judge0Properties;
+//import com.virtualLaboratory.dto.judge0.Judge0SubmissionResponse;
 import com.virtualLaboratory.repository.AssignmentRepository;
 import com.virtualLaboratory.repository.ProgrammingLanguageRepository;
 import com.virtualLaboratory.repository.SubmissionRepository;
@@ -24,7 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.nio.charset.StandardCharsets;
+//import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -36,23 +36,22 @@ public class SubmissionService {
     private final ProgrammingLanguageRepository programmingLanguageRepository;
     private final CurrentUserService currentUserService;
     private final SubmissionMapper submissionMapper;
-    private final Judge0IntegrationService judge0IntegrationService;
-    private final Judge0Properties judge0Properties;
 
     public SubmissionService(SubmissionRepository submissionRepository,
                              AssignmentRepository assignmentRepository,
                              ProgrammingLanguageRepository programmingLanguageRepository,
                              CurrentUserService currentUserService,
-                             SubmissionMapper submissionMapper,
-                             Judge0IntegrationService judge0IntegrationService,
-                             Judge0Properties judge0Properties) {
+                             SubmissionMapper submissionMapper
+                             //,Judge0IntegrationService judge0IntegrationService,
+                             //Judge0Properties judge0Properties
+                              ) {
         this.submissionRepository = submissionRepository;
         this.assignmentRepository = assignmentRepository;
         this.programmingLanguageRepository = programmingLanguageRepository;
         this.currentUserService = currentUserService;
         this.submissionMapper = submissionMapper;
-        this.judge0IntegrationService = judge0IntegrationService;
-        this.judge0Properties = judge0Properties;
+        //this.judge0IntegrationService = judge0IntegrationService;
+        //this.judge0Properties = judge0Properties;
     }
 
     public Page<SubmissionDTO> getSubmissions(Long assignmentId, String status, Long sectionId, Pageable pageable) {
@@ -116,22 +115,28 @@ public class SubmissionService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only students can run code");
         }
 
-        validateInputSize(request);
+        //validateInputSize(request);
 
-        ProgrammingLanguage language = programmingLanguageRepository.findById(request.languageId())
+        ProgrammingLanguage language =programmingLanguageRepository.findById(request.languageId())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Language not found"));
         if (!language.isActive()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Language is not active");
         }
 
-        Integer judge0LanguageId = resolveJudge0LanguageId(language);
+      /*  Integer judge0LanguageId = resolveJudge0LanguageId(language);
         Judge0SubmissionResponse judge0Response = judge0IntegrationService.submitAndWait(
             request.code(),
             judge0LanguageId,
             request.stdin()
         );
-
-        return toRunResponse(judge0Response);
+        String res=
+        return toRunResponse(judge0Response);*/
+        return new SubmissionRunResponse("Code received successfully!\n" +
+                "\n" +
+                "Your code has been submitted. Code execution is temporarily unavailable.",
+                "",
+                -1,
+                0L);
     }
 
     public SubmissionDTO getSubmission(Long id) {
@@ -173,7 +178,7 @@ public class SubmissionService {
         return submissionRepository.findByStudentId(student.getId()).stream().map(submissionMapper::toDto).collect(Collectors.toList());
     }
 
-    private void validateInputSize(SubmissionRunRequest request) {
+ /*   private void validateInputSize(SubmissionRunRequest request) {
         int sourceCodeBytes = request.code().getBytes(StandardCharsets.UTF_8).length;
         if (sourceCodeBytes > judge0Properties.getMaxSourceCodeBytes()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Source code exceeds maximum size");
@@ -185,9 +190,9 @@ public class SubmissionService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stdin exceeds maximum size");
             }
         }
-    }
+    }*/
 
-    private Integer resolveJudge0LanguageId(ProgrammingLanguage language) {
+    /*private Integer resolveJudge0LanguageId(ProgrammingLanguage language) {
         Integer judge0LanguageId = language.getJudge0LanguageId();
         if (judge0LanguageId == null) {
             judge0LanguageId = judge0Properties.getLanguageMapping().get(language.getId());
@@ -196,9 +201,9 @@ public class SubmissionService {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Language not configured for execution");
         }
         return judge0LanguageId;
-    }
+    }*/
 
-    private SubmissionRunResponse toRunResponse(Judge0SubmissionResponse response) {
+    /*private SubmissionRunResponse toRunResponse(Judge0SubmissionResponse response) {
         String stdout = response.stdout() != null ? response.stdout() : "";
         String stderr = response.stderr() != null ? response.stderr() : "";
         if (response.compileOutput() != null && !response.compileOutput().isBlank()) {
@@ -225,5 +230,5 @@ public class SubmissionService {
         } catch (NumberFormatException ex) {
             return 0L;
         }
-    }
+    }*/
 }
