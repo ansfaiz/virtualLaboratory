@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { FlaskConical, ArrowLeft, Home } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 
 const ROLE_HOME = {
   ADMIN:       '/admin',
@@ -44,7 +44,7 @@ export default function NotFoundPage() {
           Page Not Found
         </h1>
         <p className="text-slate-500 dark:text-slate-400 leading-relaxed mb-8 max-w-sm mx-auto">
-          The page you're looking for doesn't exist or has been moved. Check the URL and try again.
+          The page you&apos;re looking for doesn&apos;t exist or has been moved. Check the URL and try again.
         </p>
 
         {/* Actions */}

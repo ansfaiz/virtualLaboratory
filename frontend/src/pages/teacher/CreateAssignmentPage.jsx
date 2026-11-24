@@ -3,7 +3,7 @@ import { Eye, Send, ChevronLeft } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import { Card, CardHeader, CardBody } from '../../components/ui/index.jsx'
 import { Input, Textarea, Select } from '../../components/forms'
-import { useToast } from '../../components/ui/Toast'
+import { useToast } from '../../components/ui/useToast'
 import { useFetch, useMutation } from '../../hooks'
 import { languageService, sectionService, assignmentService } from '../../services'
 import Skeleton from '../../components/ui/Skeleton'
@@ -208,7 +208,7 @@ export default function CreateAssignmentPage() {
           <CardHeader>
             <h3 className="font-medium text-slate-900 dark:text-slate-100">Starter Code</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              This code will be pre-filled in the student's editor
+              This code will be pre-filled in the student&apos;s editor
             </p>
           </CardHeader>
           <CardBody>
@@ -233,7 +233,7 @@ export default function CreateAssignmentPage() {
           <CardBody>
             {sectError ? (
               <p className="text-sm text-rose-500 text-center py-4">
-                Failed to load sections. Make sure you're logged in.
+                Failed to load sections. Make sure you&apos;re logged in.
               </p>
             ) : sections.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-4">

@@ -1,4 +1,4 @@
-import { Users, Layers, UsersRound, Code2, BookOpen, ClipboardList, Activity } from 'lucide-react'
+import { Users, Layers, UsersRound, BookOpen, ClipboardList, Activity } from 'lucide-react'
 import { StatCard, Card, CardHeader, Avatar } from '../../components/ui/index.jsx'
 import { formatDate, roleColor } from '../../utils'
 import { useFetch } from '../../hooks'

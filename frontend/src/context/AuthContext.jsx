@@ -1,8 +1,7 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { authService, languageService } from '../services'
 import { setLanguageCatalog } from '../utils/dataHelpers'
-
-const AuthContext = createContext(null)
+import { AuthContext } from './authContextDef'
 
 export function AuthProvider({ children }) {
   const [user, setUser]       = useState(null)
@@ -26,7 +25,7 @@ export function AuthProvider({ children }) {
     languageService.getAll()
       .then(r => setLanguageCatalog(r.data ?? r))
       .catch(() => { /* non-fatal — falls back to mock catalog */ })
-  }, [user?.id])
+  }, [user])
 
   // POST /auth/login → { user: UserDTO, token }
   const login = useCallback(async (credentials) => {
@@ -62,10 +61,4 @@ export function AuthProvider({ children }) {
       {children}
     </AuthContext.Provider>
   )
-}
-
-export const useAuth = () => {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
-  return ctx
 }

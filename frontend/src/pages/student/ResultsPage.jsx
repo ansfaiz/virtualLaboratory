@@ -128,7 +128,7 @@ export default function ResultsPage() {
                   }`}>{s.marks}</div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{titleFor(s.assignmentId)}</p>
-                    {s.feedback && <p className="text-xs text-slate-500 mt-0.5 italic">"{s.feedback}"</p>}
+                    {s.feedback && <p className="text-xs text-slate-500 mt-0.5 italic">&quot;{s.feedback}&quot;</p>}
                     {s.executionMs != null && <p className="text-xs text-slate-400 mt-0.5">{s.executionMs}ms · exit {s.exitCode}</p>}
                   </div>
                   <div className="text-right shrink-0">

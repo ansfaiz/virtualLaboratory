@@ -6,7 +6,7 @@
 
 import {
   MOCK_LANGUAGES, MOCK_BATCHES, MOCK_SECTIONS, MOCK_USERS,
-  MOCK_ASSIGNMENTS, MOCK_SUBMISSIONS, MOCK_ALL_SUBMISSIONS, ADMIN_STATS,
+  MOCK_ASSIGNMENTS, MOCK_ALL_SUBMISSIONS,
 } from '../data/mockData'
 
 // Utility: simulate network delay for realism
@@ -53,7 +53,8 @@ export const mockAuthService = {
       err.response = { status: 401, data: { message: 'Invalid email or password' } }
       throw err
     }
-    const { password: _p, ...user } = account
+    const user = { ...account }
+    delete user.password
     const token = `mock-jwt-token-${user.role.toLowerCase()}-${user.id}-${Date.now()}`
     return { user, token }
   },
@@ -119,6 +120,7 @@ export const mockUserService = {
   },
 
   async resetPassword(id, _data) {
+    void id; void _data
     await delay(200)
     return ok(null)
   },
@@ -207,11 +209,13 @@ export const mockSectionService = {
   },
 
   async enrollStudent(_sectionId, _studentId) {
+    void _sectionId; void _studentId
     await delay(200)
     return ok(null)
   },
 
   async removeStudent(_sectionId, _studentId) {
+    void _sectionId; void _studentId
     await delay(200)
     return ok(null)
   },
@@ -347,6 +351,7 @@ export const mockAssignmentService = {
   },
 
   async assignToSection(_id, _sectionId) {
+    void _id; void _sectionId
     await delay(200)
     return ok(null)
   },
@@ -399,6 +404,7 @@ export const mockSubmissionService = {
   },
 
   async submit({ assignmentId, code, languageId }) {
+    void languageId
     await delay(500)
     const existing = _allSubmissions.find(s => s.assignmentId === Number(assignmentId) && s.studentId === 4)
     if (existing) {
@@ -429,6 +435,7 @@ export const mockSubmissionService = {
   },
 
   async runCode({ code, languageId }) {
+    void languageId
     await delay(1200) // simulate execution delay
     // Simulate a realistic run response
     const hasError = code.includes('syntax error') || code.includes('undefined_var')

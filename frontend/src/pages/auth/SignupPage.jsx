@@ -4,7 +4,7 @@ import {
   FlaskConical, Eye, EyeOff, Lock, Mail, User,
   ArrowRight, CheckCircle2, ArrowLeft,
 } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import apiClient from '../../services/apiClient'
 
 // POST /users { name, email, password, role, batchId? } → UserDTO
