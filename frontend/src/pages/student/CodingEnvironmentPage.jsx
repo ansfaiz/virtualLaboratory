@@ -6,20 +6,14 @@ import {
   Terminal, BookOpen, CheckCircle2, AlertCircle, Loader2, RefreshCw
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
-import { useToast } from '../../components/ui/Toast'
-import { useTheme } from '../../context/ThemeContext'
+import { useToast } from '../../components/ui/useToast'
+import { useTheme } from '../../context/useTheme'
 import { useFetch, useMutation } from '../../hooks'
 import { assignmentService, submissionService, languageService } from '../../services'
 import Skeleton from '../../components/ui/Skeleton'
 import { monacoLanguageMap } from '../../utils'
 
 const CONSOLE_PLACEHOLDER = `// Console output will appear here after running your code.\n// Click "Run Code" to execute against sample input.`
-
-const difficultyColor = {
-  EASY:   'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400',
-  MEDIUM: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400',
-  HARD:   'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400',
-}
 
 export default function CodingEnvironmentPage() {
   const { id }     = useParams()

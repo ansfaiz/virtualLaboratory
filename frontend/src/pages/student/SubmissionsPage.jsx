@@ -53,7 +53,7 @@ export default function StudentSubmissionsPage() {
     },
     { key: 'feedback', label: 'Feedback',
       render: val => val
-        ? <span className="text-xs text-slate-500 italic truncate max-w-xs block">"{val}"</span>
+        ? <span className="text-xs text-slate-500 italic truncate max-w-xs block">&quot;{val}&quot;</span>
         : <span className="text-xs text-slate-400">—</span>
     },
   ]

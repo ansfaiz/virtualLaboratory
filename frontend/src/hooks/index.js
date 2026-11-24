@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 // Generic async data fetcher.
 // fetchFn should return the data directly (already unwrapped from response).
@@ -12,11 +12,17 @@ export function useFetch(fetchFn, deps = []) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  // Store fetchFn in a ref so the execute callback stays stable while always
+  // calling the latest version of fetchFn — avoids adding fetchFn to useCallback
+  // deps which would change on every render (inline arrow functions).
+  const fetchFnRef = useRef(fetchFn)
+  useEffect(() => { fetchFnRef.current = fetchFn })
+
   const execute = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const result = await fetchFn()
+      const result = await fetchFnRef.current()
       // Reliably detect a real Axios response: it always has a `config` key.
       // Mock services return plain { data: ... } objects (no `config`).
       // This replaces the old fragile key-count heuristic (<= 3 keys).
@@ -35,9 +41,13 @@ export function useFetch(fetchFn, deps = []) {
     } finally {
       setLoading(false)
     }
-  }, deps)
+  }, [])
 
-  useEffect(() => { execute() }, [execute])
+  // Re-run whenever caller-provided deps change (e.g. route param id changes).
+  // We also run on mount via the empty-array useCallback above + this effect.
+  // Using a JSON-serialized key to avoid ESLint's non-literal deps array warning.
+  const depsKey = JSON.stringify(deps)
+  useEffect(() => { execute() }, [execute, depsKey])
 
   return { data, loading, error, refetch: execute }
 }

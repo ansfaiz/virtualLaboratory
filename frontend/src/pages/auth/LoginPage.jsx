@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { FlaskConical, Eye, EyeOff, Lock, Mail, ArrowRight, CheckCircle2 } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -372,7 +372,7 @@ export default function LoginPage() {
 
           {/* Sign up link */}
           <p className="mt-6 text-center text-sm text-slate-600">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link to="/signup"
               className="text-lab-400 hover:text-lab-300 font-medium transition-colors duration-150 inline-flex items-center gap-1">
               Create one

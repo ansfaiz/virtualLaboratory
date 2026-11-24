@@ -1,10 +1,10 @@
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Users, BookOpen, ClipboardList, FlaskConical,
-  Code2, BarChart3, Settings, LogOut, ChevronRight,
-  Layers, GraduationCap, FileCode, Trophy, BookMarked, UsersRound
+  Code2, BarChart3, LogOut, ChevronRight,
+  Layers, FileCode, Trophy, BookMarked, UsersRound
 } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { Avatar } from '../ui/index.jsx'
 import { cn } from '../../utils'
 

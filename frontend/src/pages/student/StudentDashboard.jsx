@@ -2,18 +2,12 @@ import { Link } from 'react-router-dom'
 import { BookMarked, CheckCircle2, Clock, Trophy, TrendingUp, Flame } from 'lucide-react'
 import { StatCard, Card, CardHeader, CardBody } from '../../components/ui/index.jsx'
 import { statusColor, formatDate } from '../../utils'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import Button from '../../components/ui/Button'
 import { useFetch } from '../../hooks'
 import { analyticsService, assignmentService, submissionService } from '../../services'
 import { getLanguageName } from '../../utils/dataHelpers'
 import Skeleton from '../../components/ui/Skeleton'
-
-const difficultyLabel = {
-  EASY:   'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20',
-  MEDIUM: 'text-amber-500 bg-amber-50 dark:bg-amber-900/20',
-  HARD:   'text-rose-500 bg-rose-50 dark:bg-rose-900/20',
-}
 
 export default function StudentDashboard() {
   const { user } = useAuth()
@@ -139,7 +133,7 @@ export default function StudentDashboard() {
                     <div className={`h-full rounded-full ${pct >= 0.9 ? 'bg-emerald-500' : pct >= 0.7 ? 'bg-amber-500' : 'bg-rose-500'}`}
                       style={{ width: `${pct * 100}%` }} />
                   </div>
-                  {s.feedback && <p className="text-xs text-slate-500 italic truncate">"{s.feedback}"</p>}
+                  {s.feedback && <p className="text-xs text-slate-500 italic truncate">&quot;{s.feedback}&quot;</p>}
                 </div>
               )
             })}

@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { Bell, Sun, Moon, User, LogOut, ChevronRight, Check, X, KeyRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
-import { useTheme } from '../../context/ThemeContext'
+import { useAuth } from '../../context/useAuth'
+import { useTheme } from '../../context/useTheme'
 import { Avatar, Badge } from '../ui/index.jsx'
 import Modal from '../ui/Modal'
 import { Input } from '../forms'
-import { useToast } from '../ui/Toast'
+import { useToast } from '../ui/useToast'
 import { userService } from '../../services'
 
 // ─── Mock notifications (replace with real API when backend ready) ─────────────

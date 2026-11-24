@@ -2,22 +2,16 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Pencil, Trash2, BookOpen } from 'lucide-react'
 import Button from '../../components/ui/Button'
-import { Card, Badge } from '../../components/ui/index.jsx'
+import { Card } from '../../components/ui/index.jsx'
 import DataTable from '../../components/ui/DataTable'
 import { SearchInput } from '../../components/forms'
-import { useToast } from '../../components/ui/Toast'
+import { useToast } from '../../components/ui/useToast'
 import { statusColor, formatDate } from '../../utils'
 import Modal from '../../components/ui/Modal'
 import { useFetch, useMutation, useDebounce } from '../../hooks'
 import { assignmentService } from '../../services'
 import { getLanguageName } from '../../utils/dataHelpers'
 import Skeleton from '../../components/ui/Skeleton'
-
-const difficultyColor = {
-  EASY:   'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400',
-  MEDIUM: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
-  HARD:   'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400',
-}
 
 export default function AssignmentsListPage() {
   const toast = useToast()
