@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - backend-phase
-
+      - main
   pull_request:
     branches:
       - main
