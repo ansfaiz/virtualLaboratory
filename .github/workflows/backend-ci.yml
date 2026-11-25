@@ -12,7 +12,7 @@ on:
 
 jobs:
   build:
-    name: build and test backend
+    name: Build, test and validate Docker image
     runs-on: ubuntu-latest
 
     defaults:
@@ -32,3 +32,6 @@ jobs:
 
       - name: Run backend tests
         run: ./mvnw -B test
+
+      - name: Build Docker image
+        run: docker build -t vls-backend:latest .
