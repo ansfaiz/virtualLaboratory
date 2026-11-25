@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - frontend-phase
+      - main
   pull_request:
     branches:
       - main
